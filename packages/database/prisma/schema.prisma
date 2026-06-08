@@ -1,0 +1,857 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+  EXITED
+}
+
+enum ApprovalStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  HOLD
+  PAID
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+  HALF_DAY
+  HOLIDAY
+  WEEK_OFF
+}
+
+enum NotificationChannel {
+  EMAIL
+  WHATSAPP
+  PUSH
+  IN_APP
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  legalName String
+  logoUrl   String?
+  address   String?
+  taxId     String?
+  workWeek  String   @default("Monday to Saturday")
+  timezone  String   @default("Asia/Kolkata")
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  departments Department[]
+  locations   Location[]
+  employees   Employee[]
+  holidays    Holiday[]
+  payrollRuns PayrollRun[]
+  settings    ModuleSetting[]
+  clientRules ClientRule[]
+  subscription Subscription?
+  tickets      Ticket[]
+  tenantUsers  User[]            @relation("TenantUsers")
+  tenantRoles  Role[]            @relation("TenantRoles")
+  tenantAudits AuditLog[]        @relation("TenantAuditLogs")
+}
+
+model User {
+  id           String     @id @default(cuid())
+  employeeId   String?    @unique
+  employee     Employee?  @relation(fields: [employeeId], references: [id])
+  email        String     @unique
+  phone        String?    @unique
+  passwordHash String
+  status       UserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  roles          UserRole[]
+  otpTokens      OtpToken[]
+  notifications  Notification[]
+  auditLogs      AuditLog[]      @relation("AuditActor")
+  socialPosts    SocialPost[]
+  socialLikes    SocialLike[]
+  socialComments SocialComment[]
+  tenantId       String?
+  tenant         Company?        @relation("TenantUsers", fields: [tenantId], references: [id], onDelete: Cascade)
+  ticketComments TicketComment[]
+}
+
+model Role {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  description  String?
+  isSystemRole Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  users       UserRole[]
+  permissions RolePermission[]
+  tenantId    String?
+  tenant      Company? @relation("TenantRoles", fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model Permission {
+  id          String  @id @default(cuid())
+  module      String
+  action      String
+  description String?
+
+  roles RolePermission[]
+
+  @@unique([module, action])
+}
+
+model UserRole {
+  id     String @id @default(cuid())
+  userId String
+  roleId String
+  user   User   @relation(fields: [userId], references: [id])
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId])
+}
+
+model RolePermission {
+  id           String     @id @default(cuid())
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@unique([roleId, permissionId])
+}
+
+model OtpToken {
+  id         String    @id @default(cuid())
+  userId     String
+  channel    String
+  otpHash    String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id])
+}
+
+model Department {
+  id                String        @id @default(cuid())
+  companyId         String
+  name              String
+  code              String
+  managerEmployeeId String?
+  status            String        @default("ACTIVE")
+  company           Company       @relation(fields: [companyId], references: [id])
+  employees         Employee[]
+  designations      Designation[]
+
+  @@unique([companyId, code])
+  @@index([companyId, status])
+}
+
+model Designation {
+  id           String      @id @default(cuid())
+  companyId    String
+  departmentId String?
+  title        String
+  grade        String?
+  status       String      @default("ACTIVE")
+  department   Department? @relation(fields: [departmentId], references: [id])
+  employees    Employee[]
+
+  @@index([companyId, status])
+  @@index([departmentId])
+}
+
+model Location {
+  id        String     @id @default(cuid())
+  companyId String
+  name      String
+  address   String?
+  city      String
+  state     String
+  country   String     @default("India")
+  status    String     @default("ACTIVE")
+  company   Company    @relation(fields: [companyId], references: [id])
+  employees Employee[]
+  holidays  Holiday[]
+
+  @@index([companyId, status])
+}
+
+model Employee {
+  id             String         @id @default(cuid())
+  companyId      String
+  employeeCode   String
+  firstName      String
+  lastName       String
+  email          String         @unique
+  phone          String?
+  gender         String?
+  dateOfBirth    DateTime?
+  joiningDate    DateTime
+  departmentId   String?
+  designationId  String?
+  locationId     String?
+  managerId      String?
+  employmentType String         @default("FULL_TIME")
+  status         EmployeeStatus @default(ACTIVE)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  company                   Company                    @relation(fields: [companyId], references: [id])
+  department                Department?                @relation(fields: [departmentId], references: [id])
+  designation               Designation?               @relation(fields: [designationId], references: [id])
+  location                  Location?                  @relation(fields: [locationId], references: [id])
+  user                      User?
+  documents                 EmployeeDocument[]
+  bankDetails               EmployeeBankDetail?
+  attendanceLogs            AttendanceLog[]
+  attendanceRegularizations AttendanceRegularization[]
+  overtimeRequests          OvertimeRequest[]
+  leaveRequests             LeaveRequest[]
+  leaveBalances             LeaveBalance[]
+  salaryStructures          SalaryStructure[]
+  payslips                  Payslip[]
+  expenses                  Expense[]
+  insurancePolicies         EmployeeInsurance[]
+  insuranceDependents       InsuranceDependent[]
+  insuranceClaims           InsuranceClaim[]
+  rewardLedgers             RewardLedger[]
+  recognitions              RecognitionReward[]        @relation("RecognitionRecipient")
+
+  @@unique([companyId, employeeCode])
+  @@index([companyId, status])
+  @@index([departmentId])
+  @@index([designationId])
+  @@index([locationId])
+  @@index([managerId])
+}
+
+model EmployeeDocument {
+  id                 String    @id @default(cuid())
+  employeeId         String
+  documentType       String
+  fileUrl            String
+  verificationStatus String    @default("PENDING")
+  verifiedBy         String?
+  verifiedAt         DateTime?
+  expiresAt          DateTime?
+  createdAt          DateTime  @default(now())
+  employee           Employee  @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId, verificationStatus])
+}
+
+model EmployeeBankDetail {
+  id                     String   @id @default(cuid())
+  employeeId             String   @unique
+  accountHolderName      String
+  bankName               String
+  accountNumberEncrypted String
+  ifsc                   String
+  branch                 String?
+  verificationStatus     String   @default("PENDING")
+  employee               Employee @relation(fields: [employeeId], references: [id])
+}
+
+model Shift {
+  id             String          @id @default(cuid())
+  companyId      String
+  name           String
+  startTime      String
+  endTime        String
+  graceMinutes   Int             @default(0)
+  halfDayMinutes Int             @default(240)
+  status         String          @default("ACTIVE")
+  logs           AttendanceLog[]
+}
+
+model AttendanceRule {
+  id                   String  @id @default(cuid())
+  companyId            String  @unique
+  lateMarkAfterMinutes Int     @default(10)
+  maxLateMarksPerMonth Int     @default(3)
+  geoRequired          Boolean @default(false)
+  selfieRequired       Boolean @default(false)
+  biometricRequired    Boolean @default(false)
+  overtimeEnabled      Boolean @default(true)
+}
+
+model AttendanceLog {
+  id                String                     @id @default(cuid())
+  employeeId        String
+  shiftId           String?
+  date              DateTime
+  checkInAt         DateTime?
+  checkOutAt        DateTime?
+  checkInLatitude   Decimal?
+  checkInLongitude  Decimal?
+  checkOutLatitude  Decimal?
+  checkOutLongitude Decimal?
+  source            String                     @default("WEB")
+  status            AttendanceStatus           @default(PRESENT)
+  approvedBy        String?
+  createdAt         DateTime                   @default(now())
+  employee          Employee                   @relation(fields: [employeeId], references: [id])
+  shift             Shift?                     @relation(fields: [shiftId], references: [id])
+  regularizations   AttendanceRegularization[]
+  overtimeRequests  OvertimeRequest[]
+
+  @@unique([employeeId, date])
+  @@index([date, status])
+  @@index([shiftId])
+}
+
+model AttendanceRegularization {
+  id                  String         @id @default(cuid())
+  employeeId          String
+  attendanceLogId     String?
+  requestedCheckInAt  DateTime?
+  requestedCheckOutAt DateTime?
+  reason              String
+  status              ApprovalStatus @default(PENDING)
+  decidedBy           String?
+  decidedAt           DateTime?
+  createdAt           DateTime       @default(now())
+  employee            Employee       @relation(fields: [employeeId], references: [id])
+  attendanceLog       AttendanceLog? @relation(fields: [attendanceLogId], references: [id])
+
+  @@index([employeeId, status])
+  @@index([attendanceLogId])
+}
+
+model OvertimeRequest {
+  id              String         @id @default(cuid())
+  employeeId      String
+  attendanceLogId String
+  hours           Decimal
+  reason          String
+  status          ApprovalStatus @default(PENDING)
+  decidedBy       String?
+  decidedAt       DateTime?
+  createdAt       DateTime       @default(now())
+  employee        Employee       @relation(fields: [employeeId], references: [id])
+  attendanceLog   AttendanceLog  @relation(fields: [attendanceLogId], references: [id])
+
+  @@index([employeeId, status])
+  @@index([attendanceLogId])
+}
+
+model LeaveType {
+  id                  String         @id @default(cuid())
+  companyId           String
+  name                String
+  code                String
+  annualQuota         Int
+  carryForwardAllowed Boolean        @default(false)
+  sandwichRuleEnabled Boolean        @default(false)
+  compOffLinked       Boolean        @default(false)
+  status              String         @default("ACTIVE")
+  requests            LeaveRequest[]
+  balances            LeaveBalance[]
+
+  @@unique([companyId, code])
+}
+
+model LeaveBalance {
+  id             String    @id @default(cuid())
+  employeeId     String
+  leaveTypeId    String
+  year           Int
+  openingBalance Decimal   @default(0)
+  accrued        Decimal   @default(0)
+  used           Decimal   @default(0)
+  carriedForward Decimal   @default(0)
+  available      Decimal   @default(0)
+  employee       Employee  @relation(fields: [employeeId], references: [id])
+  leaveType      LeaveType @relation(fields: [leaveTypeId], references: [id])
+
+  @@unique([employeeId, leaveTypeId, year])
+}
+
+model LeaveRequest {
+  id          String         @id @default(cuid())
+  employeeId  String
+  leaveTypeId String
+  fromDate    DateTime
+  toDate      DateTime
+  days        Decimal
+  reason      String
+  status      ApprovalStatus @default(PENDING)
+  managerId   String?
+  decidedAt   DateTime?
+  createdAt   DateTime       @default(now())
+  employee    Employee       @relation(fields: [employeeId], references: [id])
+  leaveType   LeaveType      @relation(fields: [leaveTypeId], references: [id])
+
+  @@index([employeeId, status])
+  @@index([leaveTypeId])
+  @@index([fromDate, toDate])
+}
+
+model SalaryStructure {
+  id              String   @id @default(cuid())
+  employeeId      String
+  effectiveFrom   DateTime
+  annualCtc       Decimal
+  basic           Decimal
+  hra             Decimal
+  allowances      Decimal  @default(0)
+  employerPf      Decimal  @default(0)
+  employeePf      Decimal  @default(0)
+  esi             Decimal  @default(0)
+  professionalTax Decimal  @default(0)
+  tds             Decimal  @default(0)
+  status          String   @default("ACTIVE")
+  employee        Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId, status])
+  @@index([effectiveFrom])
+}
+
+model PayrollRun {
+  id          String         @id @default(cuid())
+  companyId   String
+  month       Int
+  year        Int
+  status      ApprovalStatus @default(DRAFT)
+  processedBy String?
+  processedAt DateTime?
+  lockedAt    DateTime?
+  company     Company        @relation(fields: [companyId], references: [id])
+  payslips    Payslip[]
+
+  @@unique([companyId, month, year])
+  @@index([companyId, status])
+}
+
+model Payslip {
+  id           String             @id @default(cuid())
+  payrollRunId String
+  employeeId   String
+  grossPay     Decimal
+  deductions   Decimal
+  netPay       Decimal
+  fileUrl      String?
+  status       ApprovalStatus     @default(DRAFT)
+  payrollRun   PayrollRun         @relation(fields: [payrollRunId], references: [id])
+  employee     Employee           @relation(fields: [employeeId], references: [id])
+  components   PayrollComponent[]
+
+  @@unique([payrollRunId, employeeId])
+  @@index([employeeId, status])
+}
+
+model PayrollComponent {
+  id        String  @id @default(cuid())
+  payslipId String
+  type      String
+  name      String
+  amount    Decimal
+  payslip   Payslip @relation(fields: [payslipId], references: [id])
+}
+
+model Holiday {
+  id         String    @id @default(cuid())
+  companyId  String
+  locationId String?
+  name       String
+  date       DateTime
+  type       String
+  status     String    @default("ACTIVE")
+  company    Company   @relation(fields: [companyId], references: [id])
+  location   Location? @relation(fields: [locationId], references: [id])
+
+  @@index([companyId, status])
+  @@index([date])
+}
+
+model Expense {
+  id                String         @id @default(cuid())
+  employeeId        String
+  category          String
+  amount            Decimal
+  receiptUrl        String?
+  claimDate         DateTime
+  status            ApprovalStatus @default(PENDING)
+  managerApprovedBy String?
+  hrApprovedBy      String?
+  reimbursedAt      DateTime?
+  employee          Employee       @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId, status])
+  @@index([claimDate])
+}
+
+model EmployeeInsurance {
+  id             String               @id @default(cuid())
+  employeeId     String
+  provider       String
+  policyNumber   String
+  policyType     String
+  coverageAmount Decimal
+  premiumAmount  Decimal              @default(0)
+  startDate      DateTime
+  endDate        DateTime
+  status         String               @default("ACTIVE")
+  createdAt      DateTime             @default(now())
+  employee       Employee             @relation(fields: [employeeId], references: [id])
+  dependents     InsuranceDependent[]
+  claims         InsuranceClaim[]
+
+  @@index([employeeId, status])
+}
+
+model InsuranceDependent {
+  id           String             @id @default(cuid())
+  employeeId   String
+  insuranceId  String?
+  fullName     String
+  relationship String
+  dateOfBirth  DateTime?
+  status       String             @default("ACTIVE")
+  createdAt    DateTime           @default(now())
+  employee     Employee           @relation(fields: [employeeId], references: [id])
+  insurance    EmployeeInsurance? @relation(fields: [insuranceId], references: [id])
+
+  @@index([employeeId, status])
+  @@index([insuranceId])
+}
+
+model InsuranceClaim {
+  id          String            @id @default(cuid())
+  employeeId  String
+  insuranceId String
+  claimNumber String?
+  claimType   String
+  claimAmount Decimal
+  claimDate   DateTime
+  documentUrl String?
+  status      ApprovalStatus    @default(PENDING)
+  decidedBy   String?
+  decidedAt   DateTime?
+  createdAt   DateTime          @default(now())
+  employee    Employee          @relation(fields: [employeeId], references: [id])
+  insurance   EmployeeInsurance @relation(fields: [insuranceId], references: [id])
+
+  @@index([employeeId, status])
+  @@index([insuranceId])
+  @@index([claimDate])
+}
+
+model JobPosting {
+  id           String           @id @default(cuid())
+  companyId    String
+  title        String
+  departmentId String?
+  locationId   String?
+  openings     Int              @default(1)
+  status       String           @default("OPEN")
+  createdBy    String?
+  createdAt    DateTime         @default(now())
+  applications JobApplication[]
+
+  @@index([companyId, status])
+  @@index([departmentId])
+  @@index([locationId])
+}
+
+model Candidate {
+  id           String           @id @default(cuid())
+  fullName     String
+  email        String
+  phone        String?
+  resumeUrl    String?
+  source       String?
+  currentStage String           @default("SCREENING")
+  createdAt    DateTime         @default(now())
+  applications JobApplication[]
+
+  @@index([currentStage])
+}
+
+model JobApplication {
+  id                  String      @id @default(cuid())
+  jobPostingId        String
+  candidateId         String
+  stage               String      @default("SCREENING")
+  status              String      @default("ACTIVE")
+  assignedRecruiterId String?
+  createdAt           DateTime    @default(now())
+  jobPosting          JobPosting  @relation(fields: [jobPostingId], references: [id])
+  candidate           Candidate   @relation(fields: [candidateId], references: [id])
+  interviews          Interview[]
+
+  @@index([jobPostingId, status])
+  @@index([candidateId])
+  @@index([stage])
+}
+
+model Interview {
+  id                    String         @id @default(cuid())
+  applicationId         String
+  interviewerEmployeeId String?
+  scheduledAt           DateTime
+  mode                  String
+  status                String         @default("SCHEDULED")
+  feedback              String?
+  application           JobApplication @relation(fields: [applicationId], references: [id])
+
+  @@index([applicationId, status])
+  @@index([scheduledAt])
+}
+
+model Notification {
+  id        String              @id @default(cuid())
+  userId    String
+  channel   NotificationChannel
+  title     String
+  body      String
+  status    String              @default("PENDING")
+  sentAt    DateTime?
+  createdAt DateTime            @default(now())
+  user      User                @relation(fields: [userId], references: [id])
+
+  @@index([userId, status])
+  @@index([createdAt])
+}
+
+model SocialPost {
+  id           String          @id @default(cuid())
+  authorUserId String
+  type         String          @default("POST")
+  title        String?
+  body         String
+  mediaUrl     String?
+  mediaType    String?
+  visibility   String          @default("COMPANY")
+  pinned       Boolean         @default(false)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  author       User            @relation(fields: [authorUserId], references: [id])
+  likes        SocialLike[]
+  comments     SocialComment[]
+
+  @@index([type, createdAt])
+  @@index([pinned])
+}
+
+model SocialLike {
+  id        String     @id @default(cuid())
+  postId    String
+  userId    String
+  createdAt DateTime   @default(now())
+  post      SocialPost @relation(fields: [postId], references: [id])
+  user      User       @relation(fields: [userId], references: [id])
+
+  @@unique([postId, userId])
+}
+
+model SocialComment {
+  id        String     @id @default(cuid())
+  postId    String
+  userId    String
+  body      String
+  createdAt DateTime   @default(now())
+  post      SocialPost @relation(fields: [postId], references: [id])
+  user      User       @relation(fields: [userId], references: [id])
+}
+
+model RewardVoucher {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  title       String
+  provider    String
+  valueAmount Decimal
+  pointsCost  Int
+  status      String    @default("ACTIVE")
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+model RewardLedger {
+  id         String   @id @default(cuid())
+  employeeId String
+  points     Int
+  reason     String
+  source     String
+  createdAt  DateTime @default(now())
+  employee   Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId, createdAt])
+}
+
+model RecognitionReward {
+  id                  String   @id @default(cuid())
+  recipientEmployeeId String
+  givenByUserId       String?
+  title               String
+  message             String
+  points              Int      @default(0)
+  createdAt           DateTime @default(now())
+  recipient           Employee @relation("RecognitionRecipient", fields: [recipientEmployeeId], references: [id])
+
+  @@index([recipientEmployeeId])
+}
+
+model BenefitItem {
+  id          String   @id @default(cuid())
+  title       String
+  provider    String
+  category    String
+  description String
+  pointsCost  Int?
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  actorUserId  String?
+  module       String
+  action       String
+  entityType   String
+  entityId     String?
+  oldValueJson Json?
+  newValueJson Json?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+  actor        User?    @relation("AuditActor", fields: [actorUserId], references: [id])
+  tenantId     String?
+  tenant       Company? @relation("TenantAuditLogs", fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([module, createdAt])
+  @@index([actorUserId])
+}
+
+model ModuleSetting {
+  id           String  @id @default(cuid())
+  companyId    String
+  module       String
+  enabled      Boolean @default(true)
+  settingsJson Json?
+  company      Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, module])
+  @@index([companyId, enabled])
+}
+
+model ClientRule {
+  id        String   @id @default(cuid())
+  companyId String
+  category  String
+  key       String
+  valueJson Json
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  company   Company  @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, category, key])
+  @@index([companyId, category, status])
+}
+
+model Plan {
+  id            String         @id @default(cuid())
+  name          String         @unique
+  monthlyPrice  Decimal
+  annualPrice   Decimal
+  employeeLimit Int
+  features      Json?
+  subscriptions Subscription[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Subscription {
+  id         String         @id @default(cuid())
+  tenantId   String         @unique
+  planId     String
+  startDate  DateTime       @default(now())
+  expiryDate DateTime
+  status     String         @default("ACTIVE")
+  company    Company        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan       Plan           @relation(fields: [planId], references: [id])
+  payments   Payment[]
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+}
+
+model Payment {
+  id             String       @id @default(cuid())
+  subscriptionId String
+  amount         Decimal
+  paymentMethod  String       @default("CARD")
+  transactionId  String?      @unique
+  status         String       @default("COMPLETED")
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+}
+
+model Ticket {
+  id           String          @id @default(cuid())
+  tenantId     String
+  ticketNumber String          @unique
+  subject      String
+  description  String
+  queue        String          @default("HR Helpdesk")
+  priority     String          @default("Medium")
+  status       String          @default("Open")
+  assignedTo   String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  company      Company         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  comments     TicketComment[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([queue])
+}
+
+model TicketComment {
+  id        String   @id @default(cuid())
+  ticketId  String
+  userId    String
+  comment   String
+  createdAt DateTime @default(now())
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+}
+
+model ErrorLog {
+  id           String   @id @default(cuid())
+  service      String
+  endpoint     String?
+  errorMessage String
+  stackTrace   String?
+  createdAt    DateTime @default(now())
+}
+
+model SystemLog {
+  id        String   @id @default(cuid())
+  service   String
+  logLevel  String
+  message   String
+  timestamp DateTime @default(now())
+}

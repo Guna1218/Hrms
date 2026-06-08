@@ -1,0 +1,28 @@
+{
+  "name": "skylinx-peopleos",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SKYLINX PeopleOS HRMS monorepo",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "start": "npm run start --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:generate": "npm run db:generate -w @skylinx/database",
+    "db:migrate": "npm run db:migrate -w @skylinx/database",
+    "db:studio": "npm run db:studio -w @skylinx/database",
+    "db:seed": "npm run db:seed -w @skylinx/database"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@types/nodemailer": "^8.0.0",
+    "nodemailer": "^8.0.10"
+  }
+}

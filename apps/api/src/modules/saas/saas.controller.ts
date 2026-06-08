@@ -1,0 +1,57 @@
+import { Body, Controller, Get, Post, Patch, Param } from "@nestjs/common";
+import { CurrentUser } from "../../common/auth/current-user.decorator";
+import { RequirePermissions } from "../../common/auth/permissions.decorator";
+import { AuthenticatedUser } from "../../common/auth/auth.types";
+import { SelectPlanDto } from "./dto/select-plan.dto";
+import { OnboardTenantDto } from "./dto/onboard-tenant.dto";
+import { SaasService } from "./saas.service";
+import { Public } from "../../common/auth/public.decorator";
+
+@Controller("saas")
+export class SaasController {
+  constructor(private readonly saasService: SaasService) {}
+
+  @Public()
+  @Post("signup")
+  signup(@Body() data: OnboardTenantDto) {
+    return this.saasService.onboardTenant(data);
+  }
+
+  @Get()
+  @RequirePermissions("saas.read")
+  summary() {
+    return this.saasService.summary();
+  }
+
+  @Get("logs")
+  @RequirePermissions("saas.read")
+  logs() {
+    return this.saasService.logs();
+  }
+
+  @Patch("companies/:id/status")
+  @RequirePermissions("saas.configure")
+  updateCompanyStatus(@Param("id") id: string, @Body("status") status: string) {
+    return this.saasService.updateCompanyStatus(id, status);
+  }
+
+  @Post("invoice")
+  @RequirePermissions("saas.configure")
+  createInvoice(@CurrentUser() user: AuthenticatedUser) {
+    return this.saasService.createInvoice(user);
+  }
+
+  @Post("license-refresh")
+  @RequirePermissions("saas.configure")
+  refreshLicense(@CurrentUser() user: AuthenticatedUser) {
+    return this.saasService.refreshLicense(user);
+  }
+
+  @Post("select-plan")
+  @RequirePermissions("saas.configure")
+  selectPlan(@CurrentUser() user: AuthenticatedUser, @Body() data: SelectPlanDto) {
+    return this.saasService.selectPlan(user, data.plan, data.paymentMethod, data.amount);
+  }
+}
+
+
