@@ -7,7 +7,6 @@ import { useEmployeeOptions } from "../lib/options";
 import { Card, MetricCard, StatusPill } from "./ui";
 import { ReferenceModuleHeader } from "./reference-module";
 import { ReferenceFlowStrip } from "./reference-sections";
-import { AssetsWorkflowWorkspace } from "./reference-workspaces";
 import { fallbackAssets } from "../lib/fallback-data";
 import { emptyAssets } from "../lib/live-data";
 
@@ -603,8 +602,6 @@ export function AssetsConsole() {
       {/* Grid tabs content layout */}
       {activeTab !== "Audit" ? (
         <>
-          <AssetsWorkflowWorkspace />
-
           {/* Asset Category list */}
           {activeTab === "Inventory" && (
             <Card>

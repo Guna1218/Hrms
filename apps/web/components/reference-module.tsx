@@ -135,7 +135,7 @@ export function ReferenceModuleHeader({
       </div>
 
       <div className="grid grid-cols-[1fr_180px_150px_auto] gap-3 border-t border-[#eef3f8] p-5 max-xl:grid-cols-2 max-sm:grid-cols-1">
-        <label className="flex min-h-10 items-center gap-2 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-muted">
+        <label className="flex min-h-10 items-center gap-2 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-muted transition duration-200 focus-within:border-brand focus-within:ring-1 focus-within:ring-brand">
           <Search className="h-4 w-4 text-[#38a7f4]" />
           <input
             className="min-w-0 flex-1 bg-transparent text-[#172033] outline-none placeholder:text-[#8ca0bf]"
@@ -147,13 +147,13 @@ export function ReferenceModuleHeader({
         <input
           value={mVal}
           onChange={(e) => setMVal(e.target.value)}
-          className="min-h-10 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-[#172033] outline-none"
+          className="min-h-10 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-[#172033] outline-none transition duration-200 focus:border-brand focus:ring-1 focus:ring-brand"
           type="month"
         />
         <select
           value={stVal}
           onChange={(e) => setStVal(e.target.value)}
-          className="min-h-10 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-[#172033] outline-none"
+          className="min-h-10 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-[#172033] outline-none transition duration-200 focus:border-brand focus:ring-1 focus:ring-brand"
         >
           <option value="All">All</option>
           <option value="Pending">Pending</option>
