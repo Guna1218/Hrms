@@ -40,7 +40,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
             params.args = params.args || {};
 
             // Flatten any compound unique indices (e.g. companyId_module) to their constituent fields
-            if (params.args.where) {
+            // ONLY if the query is a findUnique query that will be translated to findFirst.
+            if (params.action === "findUnique" && params.args.where) {
               for (const key of Object.keys(params.args.where)) {
                 const val = params.args.where[key];
                 if (val && typeof val === "object" && !Array.isArray(val) && key.includes("_")) {
