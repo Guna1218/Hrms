@@ -119,6 +119,7 @@ export class AssetsService {
       assignedTo: asset.assignedTo
         ? `${asset.assignedTo.firstName} ${asset.assignedTo.lastName}`
         : "-",
+      employeeStatus: asset.assignedTo?.status || null,
       department: asset.assignedTo?.department?.name || "-",
       status: asset.status,
       condition: asset.condition,
@@ -128,7 +129,7 @@ export class AssetsService {
     const assigned = assets.filter((a) => a.status === "ASSIGNED").length;
     const available = assets.filter((a) => a.status === "AVAILABLE").length;
     const returned = auditLogs.filter((log) => log.action === "asset.return").length;
-    const handoverPending = assets.filter((a) => a.status === "ASSIGNED" && a.condition === "POOR").length;
+    const handoverPending = assets.filter((a) => a.status === "ASSIGNED" && (a.condition === "POOR" || a.assignedTo?.status === "EXITED")).length;
 
     const categories = [
       { type: "Laptop", count: assets.filter((a) => a.type === "Laptop").length },
@@ -217,7 +218,7 @@ export class AssetsService {
     return response("assets", "assign", updated);
   }
 
-  async returnAsset(user: AuthenticatedUser, assetTag: string) {
+  async returnAsset(user: AuthenticatedUser, assetTag: string, condition?: string) {
     const tenantId = this.getTenantId();
 
     const asset = await this.prisma.companyAsset.findFirst({
@@ -232,6 +233,7 @@ export class AssetsService {
       data: {
         status: "AVAILABLE",
         assignedToId: null,
+        condition: condition || asset.condition,
       },
     });
 

@@ -33,8 +33,12 @@ export class AssetsController {
 
   @Post(":assetTag/return")
   @RequirePermissions("assets.configure")
-  returnAsset(@CurrentUser() user: AuthenticatedUser, @Param("assetTag") assetTag: string) {
-    return this.assetsService.returnAsset(user, assetTag);
+  returnAsset(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("assetTag") assetTag: string,
+    @Body("condition") condition?: string,
+  ) {
+    return this.assetsService.returnAsset(user, assetTag, condition);
   }
 
   @Delete(":assetTag")

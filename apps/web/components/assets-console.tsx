@@ -91,6 +91,7 @@ export function AssetsConsole() {
 
   const [panelAssetTag, setPanelAssetTag] = useState("");
   const [panelEmployeeId, setPanelEmployeeId] = useState("");
+  const [returnCondition, setReturnCondition] = useState("GOOD");
 
   const employees = useEmployeeOptions();
 
@@ -163,9 +164,13 @@ export function AssetsConsole() {
     try {
       await apiFetch(`/assets/${panelAssetTag}/return`, {
         method: "POST",
+        body: JSON.stringify({
+          condition: returnCondition,
+        }),
       });
       setMessage(`Asset "${panelAssetTag}" returned successfully.`);
       setPanelAssetTag("");
+      setReturnCondition("GOOD");
       setShowReturnPanel(false);
       load();
     } catch (err) {
@@ -250,7 +255,7 @@ export function AssetsConsole() {
   const filteredRows = data.rows.filter((row) => {
     // 1. Tab routing
     if (activeTab === "Assigned" && row.status !== "ASSIGNED") return false;
-    if (activeTab === "Handover" && (row.status !== "ASSIGNED" || row.condition !== "POOR")) return false;
+    if (activeTab === "Handover" && (row.status !== "ASSIGNED" || (row.condition !== "POOR" && row.employeeStatus !== "EXITED"))) return false;
 
     // 2. Search filter
     if (search) {
@@ -516,6 +521,19 @@ export function AssetsConsole() {
               ))}
             </select>
           </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold text-[#49637f]">Return Condition</label>
+            <select
+              className="w-full min-h-10 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-[#172033] outline-none"
+              value={returnCondition}
+              onChange={(e) => setReturnCondition(e.target.value)}
+              required
+            >
+              <option value="GOOD">GOOD</option>
+              <option value="POOR">POOR</option>
+              <option value="DAMAGED">DAMAGED</option>
+            </select>
+          </div>
           <div className="flex gap-2 justify-end border-t pt-3 mt-2">
             <button
               type="button"
@@ -667,12 +685,16 @@ export function AssetsConsole() {
                               <Check className="h-3.5 w-3.5" /> Assign
                             </button>
                           ) : (
-                            <button
-                              className="flex min-h-8 items-center gap-1 rounded-lg border border-[#dce2eb] px-3 text-xs font-semibold hover:bg-slate-50"
-                              onClick={() => handleReturnRow(row.assetTag)}
-                            >
-                              <RotateCcw className="h-3.5 w-3.5" /> Return
-                            </button>
+                             <button
+                               className="flex min-h-8 items-center gap-1 rounded-lg border border-[#dce2eb] px-3 text-xs font-semibold hover:bg-slate-50"
+                               onClick={() => {
+                                 setPanelAssetTag(row.assetTag);
+                                 setReturnCondition(row.condition || "GOOD");
+                                 setShowReturnPanel(true);
+                               }}
+                             >
+                               <RotateCcw className="h-3.5 w-3.5" /> Return
+                             </button>
                           )}
                           <button
                             className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#fde8e6] text-[#ba3d37] hover:bg-[#fde8e6] transition-colors"

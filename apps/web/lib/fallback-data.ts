@@ -398,8 +398,8 @@ export const fallbackAssets = {
     { type: "Accessories", count: 2 },
   ],
   rows: [
-    { id: "asset_laptop_emp_1001", assetTag: "SKY-LAP-001", type: "Laptop", item: "HP EliteBook", assignedTo: "Aarav Mehta", department: "People", status: "ASSIGNED", condition: "GOOD" },
-    { id: "asset_id_emp_1001", assetTag: "SKY-ID-EMP-1001", type: "ID Card", item: "Employee ID Card", assignedTo: "Aarav Mehta", department: "People", status: "ASSIGNED", condition: "GOOD" },
+    { id: "asset_laptop_emp_1001", assetTag: "SKY-LAP-001", type: "Laptop", item: "HP EliteBook", assignedTo: "Aarav Mehta", employeeStatus: "ACTIVE", department: "People", status: "ASSIGNED", condition: "GOOD" },
+    { id: "asset_id_emp_1001", assetTag: "SKY-ID-EMP-1001", type: "ID Card", item: "Employee ID Card", assignedTo: "Aarav Mehta", employeeStatus: "ACTIVE", department: "People", status: "ASSIGNED", condition: "GOOD" },
   ],
   logs: [],
 };
