@@ -1,6 +1,6 @@
 "use client";
 
-import { BriefcaseBusiness, Check, RotateCcw, PackagePlus, UserRound, CheckCircle2, Download, FileCheck2, X } from "lucide-react";
+import { BriefcaseBusiness, Check, RotateCcw, PackagePlus, UserRound, CheckCircle2, Download, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiFetch } from "../lib/client-api";
 import { useEmployeeOptions } from "../lib/options";
@@ -35,6 +35,35 @@ function toneFor(status: string): "green" | "yellow" | "red" | undefined {
   return "red";
 }
 
+// Reusable overlay modal component
+interface ModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+}
+
+function Modal({ isOpen, onClose, title, children }: ModalProps) {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+      <div className="relative w-full max-w-lg rounded-xl border border-[#dce2eb] bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200 text-left">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+          <h3 className="text-lg font-bold text-slate-900">{title}</h3>
+          <button
+            type="button"
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+            onClick={onClose}
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function AssetsConsole() {
   const [data, setData] = useState<AssetsData>(emptyAssets);
   const [message, setMessage] = useState("");
@@ -46,11 +75,12 @@ export function AssetsConsole() {
   const [status, setStatus] = useState("All");
   const [month, setMonth] = useState("");
 
-  // Action Panel Toggle state
+  // Modal / Popup state
   const [showAddPanel, setShowAddPanel] = useState(false);
   const [showAssignPanel, setShowAssignPanel] = useState(false);
   const [showReturnPanel, setShowReturnPanel] = useState(false);
   const [assignTargetAsset, setAssignTargetAsset] = useState<string | null>(null);
+  const [deleteTargetAsset, setDeleteTargetAsset] = useState<string | null>(null);
 
   // Form Field states
   const [newAssetTag, setNewAssetTag] = useState("");
@@ -177,6 +207,21 @@ export function AssetsConsole() {
     }
   }
 
+  async function handleDeleteAsset(assetTag: string) {
+    setMessage("");
+    setError("");
+    try {
+      await apiFetch(`/assets/${assetTag}`, {
+        method: "DELETE",
+      });
+      setMessage(`Asset "${assetTag}" deleted successfully.`);
+      setDeleteTargetAsset(null);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete asset.");
+    }
+  }
+
   async function handleExport() {
     try {
       const csvContent = [
@@ -267,7 +312,7 @@ export function AssetsConsole() {
             icon: <PackagePlus className="h-4 w-4" />,
             tone: "primary",
             onClick: () => {
-              setShowAddPanel(!showAddPanel);
+              setShowAddPanel(true);
               setShowAssignPanel(false);
               setShowReturnPanel(false);
               setAssignTargetAsset(null);
@@ -277,7 +322,7 @@ export function AssetsConsole() {
             label: "Assign",
             icon: <UserRound className="h-4 w-4" />,
             onClick: () => {
-              setShowAssignPanel(!showAssignPanel);
+              setShowAssignPanel(true);
               setShowAddPanel(false);
               setShowReturnPanel(false);
               setAssignTargetAsset(null);
@@ -287,7 +332,7 @@ export function AssetsConsole() {
             label: "Return",
             icon: <RotateCcw className="h-4 w-4" />,
             onClick: () => {
-              setShowReturnPanel(!showReturnPanel);
+              setShowReturnPanel(true);
               setShowAddPanel(false);
               setShowAssignPanel(false);
               setAssignTargetAsset(null);
@@ -315,222 +360,245 @@ export function AssetsConsole() {
         </div>
       ) : null}
 
-      {/* Dynamic Action Forms Workspace */}
-      <div id="asset-actions-form" className="grid gap-3">
-        {showAddPanel && (
-          <form className="grid grid-cols-6 gap-3 rounded-lg border border-[#dce2eb] bg-white p-5 shadow-sm max-lg:grid-cols-2 max-sm:grid-cols-1" onSubmit={handleAddAsset}>
-            <div className="col-span-full font-bold text-ink">Add New Company Asset</div>
-            <div className="col-span-2 max-lg:col-span-1">
-              <label className="mb-1 block text-xs font-bold text-[#49637f]">Asset Tag / Serial No.</label>
-              <input
-                className="w-full min-h-10 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-[#172033] outline-none"
-                placeholder="e.g. SKY-LAP-023"
-                value={newAssetTag}
-                onChange={(e) => setNewAssetTag(e.target.value)}
-                required
-              />
-            </div>
+      {/* Overlay Modals Workspace */}
+      <Modal isOpen={showAddPanel} onClose={() => setShowAddPanel(false)} title="Add New Company Asset">
+        <form className="grid grid-cols-2 gap-4" onSubmit={handleAddAsset}>
+          <div className="col-span-2">
+            <label className="mb-1 block text-xs font-bold text-[#49637f]">Asset Tag / Serial No.</label>
+            <input
+              className="w-full min-h-10 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-[#172033] outline-none"
+              placeholder="e.g. SKY-LAP-023"
+              value={newAssetTag}
+              onChange={(e) => setNewAssetTag(e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold text-[#49637f]">Type</label>
+            <select
+              className="w-full min-h-10 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-[#172033] outline-none"
+              value={newAssetType}
+              onChange={(e) => setNewAssetType(e.target.value)}
+            >
+              <option value="Laptop">Laptop</option>
+              <option value="ID Card">ID Card</option>
+              <option value="Phone">Phone</option>
+              <option value="Accessories">Accessories</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold text-[#49637f]">Condition</label>
+            <select
+              className="w-full min-h-10 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-[#172033] outline-none"
+              value={newAssetCondition}
+              onChange={(e) => setNewAssetCondition(e.target.value)}
+            >
+              <option value="GOOD">Good</option>
+              <option value="AVERAGE">Average</option>
+              <option value="POOR">Poor</option>
+            </select>
+          </div>
+          <div className="col-span-2">
+            <label className="mb-1 block text-xs font-bold text-[#49637f]">Item Name / Description</label>
+            <input
+              className="w-full min-h-10 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-[#172033] outline-none"
+              placeholder="e.g. Dell Latitude 5420"
+              value={newAssetItem}
+              onChange={(e) => setNewAssetItem(e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold text-[#49637f]">Initial Status</label>
+            <select
+              className="w-full min-h-10 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-[#172033] outline-none"
+              value={newAssetStatus}
+              onChange={(e) => setNewAssetStatus(e.target.value)}
+            >
+              <option value="AVAILABLE">Available</option>
+              <option value="ASSIGNED">Assigned</option>
+            </select>
+          </div>
+          {newAssetStatus === "ASSIGNED" && (
             <div>
-              <label className="mb-1 block text-xs font-bold text-[#49637f]">Type</label>
+              <label className="mb-1 block text-xs font-bold text-[#49637f]">Assign To Employee</label>
               <select
                 className="w-full min-h-10 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-[#172033] outline-none"
-                value={newAssetType}
-                onChange={(e) => setNewAssetType(e.target.value)}
-              >
-                <option value="Laptop">Laptop</option>
-                <option value="ID Card">ID Card</option>
-                <option value="Phone">Phone</option>
-                <option value="Accessories">Accessories</option>
-              </select>
-            </div>
-            <div className="col-span-2 max-lg:col-span-1">
-              <label className="mb-1 block text-xs font-bold text-[#49637f]">Item Name / Description</label>
-              <input
-                className="w-full min-h-10 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-[#172033] outline-none"
-                placeholder="e.g. Dell Latitude 5420"
-                value={newAssetItem}
-                onChange={(e) => setNewAssetItem(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-bold text-[#49637f]">Condition</label>
-              <select
-                className="w-full min-h-10 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-[#172033] outline-none"
-                value={newAssetCondition}
-                onChange={(e) => setNewAssetCondition(e.target.value)}
-              >
-                <option value="GOOD">Good</option>
-                <option value="AVERAGE">Average</option>
-                <option value="POOR">Poor</option>
-              </select>
-            </div>
-            <div className="col-span-2 max-lg:col-span-1">
-              <label className="mb-1 block text-xs font-bold text-[#49637f]">Initial Status</label>
-              <select
-                className="w-full min-h-10 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-[#172033] outline-none"
-                value={newAssetStatus}
-                onChange={(e) => setNewAssetStatus(e.target.value)}
-              >
-                <option value="AVAILABLE">Available</option>
-                <option value="ASSIGNED">Assigned</option>
-              </select>
-            </div>
-            {newAssetStatus === "ASSIGNED" && (
-              <div className="col-span-2 max-lg:col-span-1">
-                <label className="mb-1 block text-xs font-bold text-[#49637f]">Assign To Employee</label>
-                <select
-                  className="w-full min-h-10 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-[#172033] outline-none"
-                  value={newAssetAssignedTo}
-                  onChange={(e) => setNewAssetAssignedTo(e.target.value)}
-                  required
-                >
-                  <option value="">Select employee...</option>
-                  {employees.map((emp) => (
-                    <option key={emp.value} value={emp.value}>{emp.label}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-            <div className="col-span-full flex justify-end gap-2 border-t pt-3">
-              <button
-                type="button"
-                className="min-h-10 rounded-lg border border-[#dce2eb] bg-white px-4 text-sm font-semibold text-[#34465f]"
-                onClick={() => setShowAddPanel(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="min-h-10 rounded-lg bg-brand px-4 text-sm font-semibold text-white"
-              >
-                Save Asset
-              </button>
-            </div>
-          </form>
-        )}
-
-        {showAssignPanel && (
-          <form className="grid grid-cols-3 gap-3 items-end rounded-lg border border-[#dce2eb] bg-white p-5 shadow-sm max-lg:grid-cols-2 max-sm:grid-cols-1" onSubmit={handleAssignAsset}>
-            <div className="col-span-full font-bold text-ink">Assign Asset to Employee</div>
-            <div>
-              <label className="mb-1 block text-xs font-bold text-[#49637f]">Select Available Asset</label>
-              <select
-                className="w-full min-h-10 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-[#172033] outline-none"
-                value={panelAssetTag}
-                onChange={(e) => setPanelAssetTag(e.target.value)}
+                value={newAssetAssignedTo}
+                onChange={(e) => setNewAssetAssignedTo(e.target.value)}
                 required
               >
-                <option value="">Choose asset...</option>
-                {data.rows.filter(r => r.status === "AVAILABLE").map(row => (
-                  <option key={row.assetTag} value={row.assetTag}>{row.assetTag} - {row.item} ({row.type})</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-bold text-[#49637f]">Select Employee</label>
-              <select
-                className="w-full min-h-10 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-[#172033] outline-none"
-                value={panelEmployeeId}
-                onChange={(e) => setPanelEmployeeId(e.target.value)}
-                required
-              >
-                <option value="">Choose employee...</option>
+                <option value="">Select employee...</option>
                 {employees.map((emp) => (
                   <option key={emp.value} value={emp.value}>{emp.label}</option>
                 ))}
               </select>
             </div>
-            <div className="flex gap-2 justify-end">
-              <button
-                type="button"
-                className="min-h-10 rounded-lg border border-[#dce2eb] bg-white px-4 text-sm font-semibold text-[#34465f]"
-                onClick={() => setShowAssignPanel(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="min-h-10 rounded-lg bg-brand px-4 text-sm font-semibold text-white"
-              >
-                Assign Asset
-              </button>
-            </div>
-          </form>
-        )}
+          )}
+          <div className="col-span-2 flex justify-end gap-2 border-t pt-3 mt-2">
+            <button
+              type="button"
+              className="min-h-10 rounded-lg border border-[#dce2eb] bg-white px-4 text-sm font-semibold text-[#34465f]"
+              onClick={() => setShowAddPanel(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="min-h-10 rounded-lg bg-brand px-4 text-sm font-semibold text-white"
+            >
+              Save Asset
+            </button>
+          </div>
+        </form>
+      </Modal>
 
-        {showReturnPanel && (
-          <form className="grid grid-cols-[1fr_auto] gap-3 items-end rounded-lg border border-[#dce2eb] bg-white p-5 shadow-sm max-sm:grid-cols-1" onSubmit={handleReturnAsset}>
-            <div className="col-span-full font-bold text-ink">Return Issued Asset</div>
-            <div>
-              <label className="mb-1 block text-xs font-bold text-[#49637f]">Select Assigned Asset</label>
-              <select
-                className="w-full min-h-10 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-[#172033] outline-none"
-                value={panelAssetTag}
-                onChange={(e) => setPanelAssetTag(e.target.value)}
-                required
-              >
-                <option value="">Choose asset...</option>
-                {data.rows.filter(r => r.status === "ASSIGNED").map(row => (
-                  <option key={row.assetTag} value={row.assetTag}>{row.assetTag} - {row.item} (Assigned to: {row.assignedTo})</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className="min-h-10 rounded-lg border border-[#dce2eb] bg-white px-4 text-sm font-semibold text-[#34465f]"
-                onClick={() => setShowReturnPanel(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="min-h-10 rounded-lg bg-brand px-4 text-sm font-semibold text-white"
-              >
-                Return Asset
-              </button>
-            </div>
-          </form>
-        )}
+      <Modal isOpen={showAssignPanel} onClose={() => setShowAssignPanel(false)} title="Assign Asset to Employee">
+        <form className="grid gap-4" onSubmit={handleAssignAsset}>
+          <div>
+            <label className="mb-1 block text-xs font-bold text-[#49637f]">Select Available Asset</label>
+            <select
+              className="w-full min-h-10 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-[#172033] outline-none"
+              value={panelAssetTag}
+              onChange={(e) => setPanelAssetTag(e.target.value)}
+              required
+            >
+              <option value="">Choose asset...</option>
+              {data.rows.filter(r => r.status === "AVAILABLE").map(row => (
+                <option key={row.assetTag} value={row.assetTag}>{row.assetTag} - {row.item} ({row.type})</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold text-[#49637f]">Select Employee</label>
+            <select
+              className="w-full min-h-10 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-[#172033] outline-none"
+              value={panelEmployeeId}
+              onChange={(e) => setPanelEmployeeId(e.target.value)}
+              required
+            >
+              <option value="">Choose employee...</option>
+              {employees.map((emp) => (
+                <option key={emp.value} value={emp.value}>{emp.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex gap-2 justify-end border-t pt-3 mt-2">
+            <button
+              type="button"
+              className="min-h-10 rounded-lg border border-[#dce2eb] bg-white px-4 text-sm font-semibold text-[#34465f]"
+              onClick={() => setShowAssignPanel(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="min-h-10 rounded-lg bg-brand px-4 text-sm font-semibold text-white"
+            >
+              Assign Asset
+            </button>
+          </div>
+        </form>
+      </Modal>
 
-        {assignTargetAsset && (
-          <form className="grid grid-cols-[1fr_auto] gap-3 items-end rounded-lg border border-[#1d4ed8]/30 bg-[#eff6ff] p-4 shadow-sm max-sm:grid-cols-1" onSubmit={(e) => {
-            e.preventDefault();
-            handleAssignRow(assignTargetAsset, panelEmployeeId);
-          }}>
-            <div>
-              <label className="mb-1 block text-xs font-bold text-[#1e40af]">Assign Asset: <span className="font-mono font-bold">{assignTargetAsset}</span> to Employee</label>
-              <select
-                className="w-full min-h-10 rounded-lg border border-[#bfdbfe] bg-white px-3 text-sm text-[#172033] outline-none"
-                value={panelEmployeeId}
-                onChange={(e) => setPanelEmployeeId(e.target.value)}
-                required
-              >
-                <option value="">Choose employee...</option>
-                {employees.map((emp) => (
-                  <option key={emp.value} value={emp.value}>{emp.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className="min-h-10 rounded-lg border border-[#bfdbfe] bg-white px-4 text-sm font-semibold text-[#34465f]"
-                onClick={() => { setAssignTargetAsset(null); setPanelEmployeeId(""); }}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="min-h-10 rounded-lg bg-brand px-4 text-sm font-semibold text-white"
-              >
-                Assign Now
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
+      <Modal isOpen={showReturnPanel} onClose={() => setShowReturnPanel(false)} title="Return Issued Asset">
+        <form className="grid gap-4" onSubmit={handleReturnAsset}>
+          <div>
+            <label className="mb-1 block text-xs font-bold text-[#49637f]">Select Assigned Asset</label>
+            <select
+              className="w-full min-h-10 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-[#172033] outline-none"
+              value={panelAssetTag}
+              onChange={(e) => setPanelAssetTag(e.target.value)}
+              required
+            >
+              <option value="">Choose asset...</option>
+              {data.rows.filter(r => r.status === "ASSIGNED").map(row => (
+                <option key={row.assetTag} value={row.assetTag}>{row.assetTag} - {row.item} (Assigned to: {row.assignedTo})</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex gap-2 justify-end border-t pt-3 mt-2">
+            <button
+              type="button"
+              className="min-h-10 rounded-lg border border-[#dce2eb] bg-white px-4 text-sm font-semibold text-[#34465f]"
+              onClick={() => setShowReturnPanel(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="min-h-10 rounded-lg bg-brand px-4 text-sm font-semibold text-white"
+            >
+              Return Asset
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Row Assignment Modal */}
+      <Modal isOpen={!!assignTargetAsset} onClose={() => setAssignTargetAsset(null)} title={`Assign Asset: ${assignTargetAsset}`}>
+        <form className="grid gap-4" onSubmit={(e) => {
+          e.preventDefault();
+          if (assignTargetAsset) handleAssignRow(assignTargetAsset, panelEmployeeId);
+        }}>
+          <div>
+            <label className="mb-1 block text-xs font-bold text-[#49637f]">Select Employee to Assign To</label>
+            <select
+              className="w-full min-h-10 rounded-lg border border-[#dce2eb] bg-white px-3 text-sm text-[#172033] outline-none"
+              value={panelEmployeeId}
+              onChange={(e) => setPanelEmployeeId(e.target.value)}
+              required
+            >
+              <option value="">Choose employee...</option>
+              {employees.map((emp) => (
+                <option key={emp.value} value={emp.value}>{emp.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex gap-2 justify-end border-t pt-3 mt-2">
+            <button
+              type="button"
+              className="min-h-10 rounded-lg border border-[#dce2eb] bg-white px-4 text-sm font-semibold text-[#34465f]"
+              onClick={() => { setAssignTargetAsset(null); setPanelEmployeeId(""); }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="min-h-10 rounded-lg bg-brand px-4 text-sm font-semibold text-white"
+            >
+              Assign Now
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal isOpen={!!deleteTargetAsset} onClose={() => setDeleteTargetAsset(null)} title="Delete Asset from Inventory">
+        <div className="grid gap-4">
+          <p className="text-sm text-slate-600">
+            Are you sure you want to permanently delete asset <span className="font-mono font-bold text-slate-900">{deleteTargetAsset}</span>? This action cannot be undone.
+          </p>
+          <div className="flex justify-end gap-2 border-t pt-3 mt-2">
+            <button
+              type="button"
+              className="min-h-10 rounded-lg border border-[#dce2eb] bg-white px-4 text-sm font-semibold text-[#34465f]"
+              onClick={() => setDeleteTargetAsset(null)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="min-h-10 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700"
+              onClick={() => {
+                if (deleteTargetAsset) handleDeleteAsset(deleteTargetAsset);
+              }}
+            >
+              Delete Asset
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Grid tabs content layout */}
       {activeTab !== "Audit" ? (
@@ -551,7 +619,7 @@ export function AssetsConsole() {
                 {data.categories.map((item) => (
                   <div className="rounded-lg border border-[#dce2eb] p-4 bg-white shadow-xs" key={item.type}>
                     <BriefcaseBusiness className="mb-3 h-5 w-5 text-brand" />
-                    <div className="font-semibold text- ink">{item.type}</div>
+                    <div className="font-semibold text-ink">{item.type}</div>
                     <div className="mt-2 text-2xl font-semibold text-[#172033]">{item.count}</div>
                   </div>
                 ))}
@@ -597,11 +665,6 @@ export function AssetsConsole() {
                               onClick={() => {
                                 setAssignTargetAsset(row.assetTag);
                                 setPanelEmployeeId("");
-                                setShowAddPanel(false);
-                                setShowAssignPanel(false);
-                                setShowReturnPanel(false);
-                                const el = document.getElementById("asset-actions-form");
-                                if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
                               }}
                             >
                               <Check className="h-3.5 w-3.5" /> Assign
@@ -614,6 +677,13 @@ export function AssetsConsole() {
                               <RotateCcw className="h-3.5 w-3.5" /> Return
                             </button>
                           )}
+                          <button
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#fde8e6] text-[#ba3d37] hover:bg-[#fde8e6] transition-colors"
+                            onClick={() => setDeleteTargetAsset(row.assetTag)}
+                            title="Delete Asset"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -642,7 +712,7 @@ export function AssetsConsole() {
               <div className="flex items-center justify-between rounded-lg border border-[#dce2eb] p-3 bg-[#f8fafc] text-sm" key={log.id}>
                 <div className="flex items-center gap-3">
                   <span className={`inline-block px-2.5 py-0.5 rounded text-xs font-semibold ${
-                    log.action === "asset.create" ? "bg-[#e6f5ef] text-[#18865a]" : log.action === "asset.assign" ? "bg-blue-50 text-blue-600" : "bg-yellow-50 text-yellow-600"
+                    log.action === "asset.create" ? "bg-[#e6f5ef] text-[#18865a]" : log.action === "asset.assign" ? "bg-blue-50 text-blue-600" : log.action === "asset.delete" ? "bg-red-50 text-red-600" : "bg-yellow-50 text-yellow-600"
                   }`}>
                     {log.action.replace("asset.", "").toUpperCase()}
                   </span>

@@ -240,6 +240,25 @@ export class AssetsService {
     return response("assets", "return", updated);
   }
 
+  async deleteAsset(user: AuthenticatedUser, assetTag: string) {
+    const tenantId = this.getTenantId();
+
+    const asset = await this.prisma.companyAsset.findFirst({
+      where: { assetTag, companyId: tenantId },
+    });
+    if (!asset) {
+      throw new NotFoundException(`Asset tag "${assetTag}" not found.`);
+    }
+
+    await this.prisma.companyAsset.delete({
+      where: { id: asset.id },
+    });
+
+    await this.audit(user, "asset.delete", assetTag, "DELETED");
+
+    return response("assets", "delete", { success: true, assetTag });
+  }
+
   private async audit(user: AuthenticatedUser, action: string, assetTag: string, status: string) {
     const tenantId = this.getTenantId();
     const log = await this.prisma.auditLog.create({
