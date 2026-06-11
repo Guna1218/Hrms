@@ -87,6 +87,7 @@ async function main() {
         { module: "approvals", action: "approve" },
         { module: "employees", action: "approve" },
         { module: "payroll", action: "approve" },
+        { module: "leave", action: "configure" },
         { module: "payroll", action: "configure" },
         { module: "mobile", action: "configure" },
         { module: "backup", action: "configure" },
