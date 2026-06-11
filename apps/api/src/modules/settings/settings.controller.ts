@@ -8,12 +8,28 @@ import { SettingsService } from "./settings.service";
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
+  /**
+   * Public endpoint — returns branding/logo data for the login page
+   * (no tenant context required, falls back to defaults)
+   */
   @Public()
   @Get("public-profile")
   publicProfile() {
     return this.settingsService.publicProfile();
   }
 
+  /**
+   * Any authenticated user can read their company's settings
+   * (needed for branding injection in the app shell)
+   */
+  @Get("rules")
+  rules() {
+    return this.settingsService.rules();
+  }
+
+  /**
+   * Only HR Admin / users with settings.configure permission can view/change company profile
+   */
   @Get("company")
   @RequirePermissions("settings.configure")
   company() {
@@ -36,12 +52,6 @@ export class SettingsController {
   @RequirePermissions("settings.configure")
   updateModule(@Param("module") module: string, @Body() body: UpdateModuleDto) {
     return this.settingsService.updateModule(module, body);
-  }
-
-  @Get("rules")
-  @RequirePermissions("settings.configure")
-  rules() {
-    return this.settingsService.rules();
   }
 
   @Patch("rules")

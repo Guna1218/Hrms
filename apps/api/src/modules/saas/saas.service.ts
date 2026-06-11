@@ -12,18 +12,34 @@ type PlanName = "Basic" | "Standard" | "Pro";
 export class SaasService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async summary() {
+  async summary(user: AuthenticatedUser) {
     await this.ensurePlansSeeded();
+    const isOwner = user.email === "skylinxcode@gmail.com";
+    const tenantId = user.tenantId || DEFAULT_COMPANY_ID;
+
     const [companies, employees, moduleSettings, billingLogs, subscriptionSetting] = await Promise.all([
-      this.prisma.company.findMany({ orderBy: { createdAt: "desc" } }),
-      this.prisma.employee.findMany({ where: { status: "ACTIVE" } }),
-      this.prisma.moduleSetting.findMany({ orderBy: { module: "asc" } }),
+      this.prisma.company.findMany({
+        where: isOwner ? {} : { id: tenantId },
+        orderBy: { createdAt: "desc" },
+      }),
+      this.prisma.employee.findMany({
+        where: { status: "ACTIVE", companyId: tenantId },
+      }),
+      this.prisma.moduleSetting.findMany({
+        where: { companyId: tenantId },
+        orderBy: { module: "asc" },
+      }),
       this.prisma.auditLog.findMany({
-        where: { module: "saas" },
+        where: {
+          module: "saas",
+          ...(isOwner ? {} : { tenantId }),
+        },
         orderBy: { createdAt: "desc" },
         take: 20,
       }),
-      this.prisma.moduleSetting.findUnique({ where: { companyId_module: { companyId: DEFAULT_COMPANY_ID, module: "subscription" } } }),
+      this.prisma.moduleSetting.findUnique({
+        where: { companyId_module: { companyId: tenantId, module: "subscription" } },
+      }),
     ]);
 
     const selectedPlan = this.resolveSelectedPlan(subscriptionSetting?.settingsJson);
@@ -56,7 +72,7 @@ export class SaasService {
         modules: 30,
         status: selectedPlan === "Pro" ? "ACTIVE" : "AVAILABLE",
         accessLevel: "Enterprise access",
-        features: ["Everything in Standard", "ATS", "Rewards", "Analytics", "Compliance", "Security", "SaaS controls"],
+        features: ["Everything in Standard", "Rewards", "Analytics", "Compliance", "Security", "SaaS controls"],
       },
     ];
     const planMatrix = [
@@ -236,7 +252,34 @@ export class SaasService {
       create: { companyId: tenantId, module: "subscription", enabled: true, settingsJson: { activePlan: planName } },
     });
 
-    // 6. Audit logging
+    // 6. Sync individual module settings according to the new plan
+    const basicModules = ["employees", "documents", "attendance", "leave", "holidays", "reports", "settings", "support"];
+    const standardModules = [...basicModules, "cards", "organization", "payroll", "expenses", "insurance", "notifications", "social", "approvals", "assets", "performance"];
+    const proModules = [...standardModules, "compliance", "security", "rewards", "analytics", "saas"];
+
+    const allowedModules = planName === "Basic"
+      ? basicModules
+      : planName === "Standard"
+      ? standardModules
+      : proModules;
+
+    await this.prisma.moduleSetting.updateMany({
+      where: {
+        companyId: tenantId,
+        module: { notIn: allowedModules },
+      },
+      data: { enabled: false },
+    });
+
+    for (const mod of allowedModules) {
+      await this.prisma.moduleSetting.upsert({
+        where: { companyId_module: { companyId: tenantId, module: mod } },
+        update: { enabled: true },
+        create: { companyId: tenantId, module: mod, enabled: true, settingsJson: {} },
+      });
+    }
+
+    // 7. Audit logging
     await this.audit(user, "plan.select", "ACTIVE", amount || 0, planName);
 
     return response("saas", "plan.select", {
@@ -412,7 +455,7 @@ export class SaasService {
       ? ["directory", "documents", "attendance", "leave"]
       : data.planName === "Standard"
       ? ["directory", "documents", "attendance", "leave", "payroll", "expenses", "insurance"]
-      : ["directory", "documents", "attendance", "leave", "payroll", "expenses", "insurance", "ats", "rewards", "analytics"];
+      : ["directory", "documents", "attendance", "leave", "payroll", "expenses", "insurance", "rewards", "analytics"];
 
     for (const mod of modulesToEnable) {
       await this.prisma.moduleSetting.create({
@@ -451,7 +494,7 @@ export class SaasService {
     const planDetails = [
       { name: "Basic", monthlyPrice: 0, annualPrice: 0, employeeLimit: 5, features: ["No hidden charges", "No credit card required", "Employee directory", "Documents", "Web attendance", "Leave basics", "Holiday calendar", "Email support"] },
       { name: "Standard", monthlyPrice: 1749, annualPrice: 17490, employeeLimit: 25, features: ["Everything in Basic", "Payroll", "Expenses", "Insurance", "ID & visiting cards", "Organization chart", "Notifications", "Phone support"] },
-      { name: "Pro", monthlyPrice: 3750, annualPrice: 37500, employeeLimit: 250, features: ["Everything in Standard", "ATS", "Rewards", "Analytics", "Compliance", "Security", "SaaS controls"] }
+      { name: "Pro", monthlyPrice: 3750, annualPrice: 37500, employeeLimit: 250, features: ["Everything in Standard", "Rewards", "Analytics", "Compliance", "Security", "SaaS controls"] }
     ];
 
     for (const p of planDetails) {

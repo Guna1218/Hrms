@@ -5,7 +5,7 @@ import { TenantContext } from "../common/tenant-context";
 class PrismaFieldsHelper {
   private static companyModels = new Set([
     "Department", "Designation", "Location", "Employee", "Shift", "AttendanceRule",
-    "LeaveType", "PayrollRun", "Holiday", "JobPosting", "ModuleSetting", "ClientRule"
+    "LeaveType", "PayrollRun", "Holiday", "JobPosting", "ModuleSetting", "ClientRule", "CompanyAsset"
   ]);
 
   private static tenantModels = new Set([
@@ -31,13 +31,24 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     this.$use(async (params, next) => {
       const tenantId = TenantContext.getTenantId();
 
-      // Only apply filters if tenantId is set
-      if (tenantId) {
+      // Only apply filters if tenantId is set and the user is NOT a system owner
+      if (tenantId && !TenantContext.isOwner()) {
         const modelName = params.model;
         if (modelName) {
           const field = PrismaFieldsHelper.getTenantField(modelName);
           if (field) {
             params.args = params.args || {};
+
+            // Flatten any compound unique indices (e.g. companyId_module) to their constituent fields
+            if (params.args.where) {
+              for (const key of Object.keys(params.args.where)) {
+                const val = params.args.where[key];
+                if (val && typeof val === "object" && !Array.isArray(val) && key.includes("_")) {
+                  Object.assign(params.args.where, val);
+                  delete params.args.where[key];
+                }
+              }
+            }
 
             // 1. Intercept read operations
             const readOperations = ["findUnique", "findFirst", "findMany", "count", "aggregate", "groupBy"];

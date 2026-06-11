@@ -69,7 +69,9 @@ model Company {
   tenantUsers  User[]            @relation("TenantUsers")
   tenantRoles  Role[]            @relation("TenantRoles")
   tenantAudits AuditLog[]        @relation("TenantAuditLogs")
+  assets       CompanyAsset[]
 }
+
 
 model User {
   id           String     @id @default(cuid())
@@ -236,6 +238,7 @@ model Employee {
   insuranceClaims           InsuranceClaim[]
   rewardLedgers             RewardLedger[]
   recognitions              RecognitionReward[]        @relation("RecognitionRecipient")
+  assets                    CompanyAsset[]
 
   @@unique([companyId, employeeCode])
   @@index([companyId, status])
@@ -855,3 +858,22 @@ model SystemLog {
   message   String
   timestamp DateTime @default(now())
 }
+
+model CompanyAsset {
+  id           String    @id @default(cuid())
+  companyId    String
+  assetTag     String    @unique
+  type         String
+  item         String
+  assignedToId String?
+  status       String    @default("AVAILABLE")
+  condition    String    @default("GOOD")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  assignedTo Employee? @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, status])
+}
+
